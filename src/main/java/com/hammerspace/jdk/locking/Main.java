@@ -28,19 +28,22 @@ public class Main {
     private static final Random RANDOM = new Random();
     private static final byte[] PRINTABLE = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvxyz0123456789".getBytes();
 
+    private static final long A_REPRODUCER_SEED = 1571768802312L;
+
     public static void main(String args[]) {
 
         final Cache cache = new Cache();
 
         final long seed = System.currentTimeMillis();
         System.out.println("seed is " + seed);
-        RANDOM.setSeed(seed);
+        RANDOM.setSeed(A_REPRODUCER_SEED);
 
         // Spawn many threads that will update the ConcurrentHashMap
         Thread[] manyReadGrabbers = new Thread[NUM_READERS];
         System.out.println("Main spawning " + NUM_READERS + " readers");
         for (int i = 0; i < NUM_READERS; i++) {
             manyReadGrabbers[i] = new Thread(new ReadGrabbingRunnable(i, cache));
+            manyReadGrabbers[i].setName("READER_" + i);
             manyReadGrabbers[i].start();
         }
         System.out.println("Main spawned " + NUM_READERS + " readers");
@@ -53,6 +56,7 @@ public class Main {
 
         System.out.println("Main spawning a writer");
         Thread writeGrabber = new Thread(new WriteGrabbingRunnable(cache));
+        writeGrabber.setName("WRITER");
         writeGrabber.start();
         System.out.println("Main spawned a writer");
 
