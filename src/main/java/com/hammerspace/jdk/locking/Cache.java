@@ -1,8 +1,9 @@
 package com.hammerspace.jdk.locking;
 
+import javax.xml.ws.Holder;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -25,14 +26,27 @@ public class Cache {
 
     public Long update(String key, BiFunction<String, Long, Long> updateFunction) {
         Long newValue;
-
+        Holder<Integer> lockCount = new Holder<>(0);
         try {
             newValue = theMap.compute(key, (strKey, currVal) -> {
                 readLock.lock();
+                // the lock might be acquired again if ConcurrentHashMap::compute() is applying my lambda again
+                // internally. so count it and print a NOTE! below when this scenario is detected.
+                lockCount.value++;
                 return updateFunction.apply(key, currVal);
             });
         } finally {
-            readLock.unlock();
+            int count = lockCount.value;
+            if (count > 1) {
+                // this means our lambda was re-applied by the ConcurrentHashMap implementation?
+                System.out.println("NOTE! lock acquired " + count + " times while processing cache update!");
+            }
+            while (count-- > 0) {
+                // if locked, then unlock. The unlock is outside the compute to ensure the lock is released
+                // only after the modification is visible in the map.
+                readLock.unlock();
+            }
+
         }
 
         return newValue;
